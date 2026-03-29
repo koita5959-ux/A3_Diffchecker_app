@@ -36,6 +36,9 @@ namespace DesktopKit.Diffchecker
         /// <summary>最後の差分検出結果（レポート出力で使用）</summary>
         private List<DiffLine> _lastDiffResult = new();
 
+        /// <summary>アプリケーション設定（保存先記憶等）</summary>
+        private readonly AppSettings _settings = new("Diffchecker");
+
         /// <summary>
         /// MainFormのコンストラクタ。
         /// </summary>
@@ -298,10 +301,38 @@ namespace DesktopKit.Diffchecker
         }
 
         /// <summary>
-        /// レポート出力ボタンのClickイベントハンドラ。
+        /// レポート出力ボタンのClickイベントハンドラ。差分レポートをテキストファイルとして保存する。
         /// </summary>
         private void BtnExport_Click(object? sender, EventArgs e)
         {
+            // デフォルトファイル名の生成
+            var name1 = Path.GetFileNameWithoutExtension(txtFile1Path.Text);
+            var name2 = Path.GetFileNameWithoutExtension(txtFile2Path.Text);
+            var defaultFileName = $"diff_{name1}_vs_{name2}_{DateTime.Now:yyyyMMdd}.txt";
+
+            // 前回の保存先を取得
+            var lastDir = _settings.Get("Diffchecker.LastSavePath");
+
+            // SaveFileDialog表示
+            var savePath = FileDialogHelper.SaveFile(
+                "レポートの保存先を選択してください",
+                "テキストファイル|*.txt",
+                defaultFileName,
+                string.IsNullOrEmpty(lastDir) ? null : lastDir);
+
+            if (savePath == null) return;
+
+            // レポート保存
+            DiffReporter.Export(savePath, txtFile1Path.Text, txtFile2Path.Text, _lastDiffResult);
+
+            // 保存先ディレクトリを記憶
+            var saveDir = Path.GetDirectoryName(savePath);
+            if (!string.IsNullOrEmpty(saveDir))
+            {
+                _settings.Set("Diffchecker.LastSavePath", saveDir);
+            }
+
+            StatusHelper.ShowSuccess(StatusLabel, $"レポートを保存しました：{savePath}");
         }
 
         /// <summary>
