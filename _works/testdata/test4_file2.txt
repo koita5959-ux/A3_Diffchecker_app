@@ -1,0 +1,5 @@
+﻿server=web01
+timeout=60
+port=8080
+debug=false
+max_connections=100

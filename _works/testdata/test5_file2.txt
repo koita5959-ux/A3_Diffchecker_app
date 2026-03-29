@@ -1,0 +1,11 @@
+﻿host=localhost
+port=3000
+database=mydb
+user=admin
+password=secret
+log_level=debug
+cache=enabled
+timeout=30
+max_pool=10
+mode=production
+feature_flag=on

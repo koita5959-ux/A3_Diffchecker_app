@@ -1,6 +1,8 @@
 using DesktopKit.Common;
 using System;
 using System.IO;
+using System.Linq;
+using System.Text;
 using System.Windows.Forms;
 using System.Drawing;
 
@@ -30,6 +32,9 @@ namespace DesktopKit.Diffchecker
         private Label lblPanel2Title = null!;
         private RichTextBox rtbFile2 = null!;
         private Button btnExport = null!;
+
+        /// <summary>最後の差分検出結果（レポート出力で使用）</summary>
+        private List<DiffLine> _lastDiffResult = new();
 
         /// <summary>
         /// MainFormのコンストラクタ。
@@ -187,6 +192,9 @@ namespace DesktopKit.Diffchecker
             Controls.Add(splitDiff);
             Controls.Add(topPanel);
             Controls.Add(bottomPanel);
+
+            // 左右スクロール連動
+            DiffRenderer.SetupScrollSync(rtbFile1, rtbFile2);
         }
 
         /// <summary>
@@ -216,7 +224,7 @@ namespace DesktopKit.Diffchecker
         }
 
         /// <summary>
-        /// 比較ボタンのClickイベントハンドラ。拡張子チェックを行う。
+        /// 比較ボタンのClickイベントハンドラ。拡張子チェック後に差分検出・色分け表示を行う。
         /// </summary>
         private void BtnCompare_Click(object? sender, EventArgs e)
         {
@@ -234,7 +242,59 @@ namespace DesktopKit.Diffchecker
                 return;
             }
 
-            StatusHelper.ShowInfo(StatusLabel, "比較準備完了");
+            // ファイル読み込み
+            var lines1 = File.ReadAllLines(txtFile1Path.Text, DetectEncoding(txtFile1Path.Text));
+            var lines2 = File.ReadAllLines(txtFile2Path.Text, DetectEncoding(txtFile2Path.Text));
+
+            // 差分検出
+            _lastDiffResult = DiffEngine.Compare(lines1, lines2);
+
+            // 色分け表示
+            DiffRenderer.Render(rtbFile1, rtbFile2, _lastDiffResult);
+
+            // ステータスバー更新
+            int modified = _lastDiffResult.Count(d => d.Status == DiffStatus.Modified);
+            int added = _lastDiffResult.Count(d => d.Status == DiffStatus.Added);
+            int deleted = _lastDiffResult.Count(d => d.Status == DiffStatus.Deleted);
+
+            if (modified + added + deleted == 0)
+            {
+                StatusHelper.ShowSuccess(StatusLabel, "比較完了 — 差分はありません");
+            }
+            else
+            {
+                StatusHelper.ShowSuccess(StatusLabel,
+                    $"比較完了 — 変更: {modified}件 / 追加: {added}件 / 削除: {deleted}件");
+            }
+
+            btnExport.Enabled = true;
+        }
+
+        /// <summary>
+        /// ファイルのエンコーディングを検出する。UTF-8を試行し、失敗時はShift_JIS(932)にフォールバックする。
+        /// </summary>
+        private static Encoding DetectEncoding(string filePath)
+        {
+            var bytes = File.ReadAllBytes(filePath);
+
+            // BOM付きUTF-8チェック
+            if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF)
+            {
+                return new UTF8Encoding(true);
+            }
+
+            // BOMなしUTF-8として解読を試行
+            try
+            {
+                var utf8 = new UTF8Encoding(false, true);
+                utf8.GetString(bytes);
+                return new UTF8Encoding(false);
+            }
+            catch (DecoderFallbackException)
+            {
+                // UTF-8でデコードできなければShift_JISにフォールバック
+                return Encoding.GetEncoding(932);
+            }
         }
 
         /// <summary>
