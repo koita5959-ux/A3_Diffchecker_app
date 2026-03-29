@@ -1,4 +1,6 @@
 using DesktopKit.Common;
+using System;
+using System.IO;
 using System.Windows.Forms;
 using System.Drawing;
 
@@ -9,6 +11,12 @@ namespace DesktopKit.Diffchecker
     /// </summary>
     public class MainForm : BaseForm
     {
+        /// <summary>
+        /// OpenFileDialogで使用するファイルフィルタ文字列。
+        /// </summary>
+        private const string FileFilter =
+            "テキスト系ファイル|*.txt;*.csv;*.json;*.xml;*.html;*.htm;*.css;*.js;*.ts;*.jsx;*.tsx;*.ini;*.log;*.md;*.ps1;*.bat;*.cmd;*.sh;*.py;*.cs;*.csproj;*.yaml;*.yml;*.toml;*.env;*.sql;*.php;*.scss;*.sass;*.less;*.conf;*.cfg;*.vbs;*.reg;*.properties|すべてのファイル|*.*";
+
         private Label lblFile1 = null!;
         private TextBox txtFile1Path = null!;
         private Button btnBrowse1 = null!;
@@ -182,31 +190,67 @@ namespace DesktopKit.Diffchecker
         }
 
         /// <summary>
-        /// 参照ボタン1のClickイベントハンドラ。
+        /// 参照ボタン1のClickイベントハンドラ。ファイル選択ダイアログを表示する。
         /// </summary>
-        private void BtnBrowse1_Click(object? sender, System.EventArgs e)
+        private void BtnBrowse1_Click(object? sender, EventArgs e)
         {
+            var path = FileDialogHelper.SelectFile("ファイル1を選択してください", FileFilter);
+            if (path != null)
+            {
+                txtFile1Path.Text = path;
+                UpdateCompareButtonState();
+            }
         }
 
         /// <summary>
-        /// 参照ボタン2のClickイベントハンドラ。
+        /// 参照ボタン2のClickイベントハンドラ。ファイル選択ダイアログを表示する。
         /// </summary>
-        private void BtnBrowse2_Click(object? sender, System.EventArgs e)
+        private void BtnBrowse2_Click(object? sender, EventArgs e)
         {
+            var path = FileDialogHelper.SelectFile("ファイル2を選択してください", FileFilter);
+            if (path != null)
+            {
+                txtFile2Path.Text = path;
+                UpdateCompareButtonState();
+            }
         }
 
         /// <summary>
-        /// 比較ボタンのClickイベントハンドラ。
+        /// 比較ボタンのClickイベントハンドラ。拡張子チェックを行う。
         /// </summary>
-        private void BtnCompare_Click(object? sender, System.EventArgs e)
+        private void BtnCompare_Click(object? sender, EventArgs e)
         {
+            var ext1 = Path.GetExtension(txtFile1Path.Text);
+            var ext2 = Path.GetExtension(txtFile2Path.Text);
+
+            if (!string.Equals(ext1, ext2, StringComparison.OrdinalIgnoreCase))
+            {
+                MessageBox.Show(
+                    "拡張子が異なるファイルは比較できません。同じ形式のファイルを選択してください。",
+                    "拡張子エラー",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                StatusHelper.ShowError(StatusLabel, "エラー：拡張子が一致しません");
+                return;
+            }
+
+            StatusHelper.ShowInfo(StatusLabel, "比較準備完了");
         }
 
         /// <summary>
         /// レポート出力ボタンのClickイベントハンドラ。
         /// </summary>
-        private void BtnExport_Click(object? sender, System.EventArgs e)
+        private void BtnExport_Click(object? sender, EventArgs e)
         {
+        }
+
+        /// <summary>
+        /// 両方のファイルパスが入力されているかに応じて比較ボタンの有効状態を更新する。
+        /// </summary>
+        private void UpdateCompareButtonState()
+        {
+            btnCompare.Enabled = !string.IsNullOrEmpty(txtFile1Path.Text)
+                              && !string.IsNullOrEmpty(txtFile2Path.Text);
         }
     }
 }
